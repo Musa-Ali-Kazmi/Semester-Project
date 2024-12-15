@@ -6,6 +6,8 @@ import torch.optim as optim
 from collections import deque
 import random
 import matplotlib.pyplot as plt
+import os
+import re
 
 # Define the Actor Network
 class Actor(nn.Module):
@@ -73,11 +75,31 @@ def train_ddpg():
 
     actor = Actor(state_dim, action_dim, max_action)
     target_actor = Actor(state_dim, action_dim, max_action)
-    target_actor.load_state_dict(actor.state_dict())
-
     critic = Critic(state_dim, action_dim)
     target_critic = Critic(state_dim, action_dim)
-    target_critic.load_state_dict(critic.state_dict())
+
+    # Load the latest checkpoint if available
+    checkpoint_pattern = re.compile(r"actor_episode_(\d+)\.pth")
+    checkpoint_files = [f for f in os.listdir('.') if checkpoint_pattern.match(f)]
+
+    last_episode = 0
+    if checkpoint_files:
+        # Get the checkpoint with the highest episode number
+        latest_checkpoint = max(checkpoint_files, key=lambda f: int(checkpoint_pattern.match(f).group(1)))
+        last_episode = int(checkpoint_pattern.match(latest_checkpoint).group(1))
+
+        actor_checkpoint = f"actor_episode_{last_episode}.pth"
+        critic_checkpoint = f"critic_episode_{last_episode}.pth"
+
+        if os.path.exists(actor_checkpoint) and os.path.exists(critic_checkpoint):
+            actor.load_state_dict(torch.load(actor_checkpoint))
+            target_actor.load_state_dict(actor.state_dict())
+            critic.load_state_dict(torch.load(critic_checkpoint))
+            target_critic.load_state_dict(critic.state_dict())
+            print(f"Loaded saved models: {actor_checkpoint} and {critic_checkpoint}")
+    else:
+        target_actor.load_state_dict(actor.state_dict())
+        target_critic.load_state_dict(critic.state_dict())
 
     actor_optimizer = optim.Adam(actor.parameters(), lr=LEARNING_RATE_ACTOR)
     critic_optimizer = optim.Adam(critic.parameters(), lr=LEARNING_RATE_CRITIC)
@@ -85,14 +107,14 @@ def train_ddpg():
 
     all_rewards = []
 
-    for episode in range(EPISODES):
+    for episode in range(last_episode, last_episode+EPISODES+1,1 ):
         state, _ = env.reset()
         total_reward = 0
 
         for _ in range(MAX_STEPS):
             env.render()  # Render the environment
 
-            # Select action with exploration noise
+            # Select action with exploration noise 
             state_tensor = torch.FloatTensor(state).unsqueeze(0)
             action = actor(state_tensor).detach().numpy()[0]
             action += np.random.normal(0, EXPLORATION_NOISE, size=action_dim)
@@ -146,8 +168,8 @@ def train_ddpg():
         all_rewards.append(total_reward)
         print(f"Episode {episode + 1}, Total Reward: {total_reward}")
 
-        # Save the models every 100 episodes
-        if (episode + 1) % 100 == 0:
+        # Save the models every 500 episodes
+        if (episode + 1) % 500 == 0:
             torch.save(actor.state_dict(), f"actor_episode_{episode + 1}.pth")
             torch.save(critic.state_dict(), f"critic_episode_{episode + 1}.pth")
             print(f"Saved models at episode {episode + 1}")
@@ -163,6 +185,7 @@ def train_ddpg():
 
 if __name__ == "__main__":
     train_ddpg()
+
 
 
 
