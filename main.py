@@ -107,7 +107,7 @@ def train_ddpg():
 
     all_rewards = []
 
-    for episode in range(last_episode, last_episode+EPISODES+1,1 ):
+    for episode in range(last_episode+1, last_episode+EPISODES+1,1 ):
         state, _ = env.reset()
         total_reward = 0
 
@@ -168,11 +168,22 @@ def train_ddpg():
         all_rewards.append(total_reward)
         print(f"Episode {episode + 1}, Total Reward: {total_reward}")
 
-        # Save the models every 500 episodes
-        if (episode + 1) % 500 == 0:
-            torch.save(actor.state_dict(), f"actor_episode_{episode + 1}.pth")
-            torch.save(critic.state_dict(), f"critic_episode_{episode + 1}.pth")
+        # Save the models every 100 episodes
+        if (episode) % 100 == 0:
+            torch.save(actor.state_dict(), f"actor_episode_{episode}.pth")
+            torch.save(critic.state_dict(), f"critic_episode_{episode}.pth")
             print(f"Saved models at episode {episode + 1}")
+
+            # Save the reward graph
+            plt.figure()
+            plt.plot(all_rewards)
+            plt.xlabel("Episode")
+            plt.ylabel("Total Reward")
+            plt.title("Learning Curve")
+            graph_filename = f"reward_graph_episode_{episode}.png"
+            plt.savefig(graph_filename)
+            plt.close()  # Close the plot to avoid memory issues
+            print(f"Saved reward graph: {graph_filename}")
 
     env.close()
 
