@@ -5,7 +5,7 @@ FROM python:3.9-slim
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libosmesa6 \
-    libglew2.1 \
+    libglew-dev \
     patchelf \
     && apt-get clean
 
@@ -17,7 +17,7 @@ COPY . .
 
 # Install Python dependencies
 RUN pip install --upgrade pip \
-    && pip install gymnasium[mujoco] matplotlib torch
+    && pip install --timeout=1200 gymnasium[mujoco] matplotlib torch
 
 # Set the default command to run the application
 CMD ["python", "main.py"]
