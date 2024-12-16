@@ -110,10 +110,15 @@ def train_ddpg():
     replay_buffer = ReplayBuffer(REPLAY_BUFFER_SIZE)
 
     all_rewards = []
+    all_actor_losses = []
+    all_critic_losses = []
 
     for episode in range(last_episode + 1, last_episode + EPISODES + 1, 1):
         state, _ = env.reset()
         total_reward = 0
+
+        actor_loss_episode = []
+        critic_loss_episode = []
 
         for _ in range(MAX_STEPS):
             env.render()  # Render the environment
@@ -159,6 +164,10 @@ def train_ddpg():
                 actor_loss.backward()
                 actor_optimizer.step()
 
+                # Log losses
+                actor_loss_episode.append(actor_loss.item())
+                critic_loss_episode.append(critic_loss.item())
+
                 # Target network updates
                 for target_param, param in zip(target_critic.parameters(), critic.parameters()):
                     target_param.data.copy_(TAU * param.data + (1 - TAU) * target_param.data)
@@ -171,6 +180,8 @@ def train_ddpg():
 
         all_rewards.append(total_reward)
         print(f"Episode {episode}, Total Reward: {total_reward}")
+        all_actor_losses.append(np.mean(actor_loss_episode))
+        all_critic_losses.append(np.mean(critic_loss_episode))
 
         # Save the models every 500 episodes
         if (episode) % 500 == 0:
@@ -189,6 +200,19 @@ def train_ddpg():
             plt.close()  # Close the plot to avoid memory issues
             print(f"Saved reward graph: {graph_filename}")
 
+            plt.figure()
+            plt.plot(all_actor_losses, marker='o', linestyle='-', color='g', label='Actor Loss')
+            plt.plot(all_critic_losses, marker='o', linestyle='-', color='r', label='Critic Loss')
+            plt.xlabel("Episode")
+            plt.ylabel("Loss")
+            plt.title("Loss Curve")
+            plt.legend()
+            loss_graph_filename = f"loss_graph_episode_{episode}.png"
+            plt.savefig(loss_graph_filename)
+            plt.close()
+            print(f"Saved loss graph: {loss_graph_filename}")
+
+
     env.close()
 
     # Plot learning curve
@@ -202,155 +226,4 @@ if __name__ == "__main__":
     train_ddpg()
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# # Define the Q-Network
-# class QNetwork(nn.Module):
-#     def __init__(self, state_dim, action_dim):
-#         super(QNetwork, self).__init__()
-#         self.fc1 = nn.Linear(state_dim, 256)
-#         self.fc2 = nn.Linear(256, 256)
-#         self.fc3 = nn.Linear(256, action_dim)
-
-#     def forward(self, x):
-#         x = torch.relu(self.fc1(x))
-#         x = torch.relu(self.fc2(x))
-#         return self.fc3(x)
-
-# # Replay Buffer
-# class ReplayBuffer:
-#     def __init__(self, capacity):
-#         self.buffer = deque(maxlen=capacity)
-
-#     def add(self, state, action, reward, next_state, done):
-#         self.buffer.append((state, action, reward, next_state, done))
-
-#     def sample(self, batch_size):
-#         batch = random.sample(self.buffer, batch_size)
-#         states, actions, rewards, next_states, dones = zip(*batch)
-#         return (np.array(states), np.array(actions), np.array(rewards),
-#                 np.array(next_states), np.array(dones))
-
-#     def __len__(self):
-#         return len(self.buffer)
-
-# # Hyperparameters
-# ENV_NAME = "Walker2d-v5"
-# EPISODES = 500
-# MAX_STEPS = 1000
-# LEARNING_RATE = 0.001
-# DISCOUNT_FACTOR = 0.99
-# BATCH_SIZE = 64
-# REPLAY_BUFFER_SIZE = 100000
-# TARGET_UPDATE_FREQ = 1000
-# EPSILON_START = 1.0
-# EPSILON_END = 0.1
-# EPSILON_DECAY = 5000
-
-# # Training Function
-# def train_ddqn():
-#     env = gym.make(ENV_NAME)
-#     state_dim = env.observation_space.shape[0]
-#     action_dim = env.action_space.n
-
-#     q_network = QNetwork(state_dim, action_dim)
-#     target_network = QNetwork(state_dim, action_dim)
-#     target_network.load_state_dict(q_network.state_dict())
-#     target_network.eval()
-
-#     optimizer = optim.Adam(q_network.parameters(), lr=LEARNING_RATE)
-#     replay_buffer = ReplayBuffer(REPLAY_BUFFER_SIZE)
-
-#     epsilon = EPSILON_START
-#     epsilon_decay = (EPSILON_START - EPSILON_END) / EPSILON_DECAY
-
-#     all_rewards = []
-#     steps = 0
-
-#     for episode in range(EPISODES):
-#         state, _ = env.reset()
-#         total_reward = 0
-
-#         for _ in range(MAX_STEPS):
-#             env.render()  # Render the environment
-
-#             steps += 1
-#             if random.random() < epsilon:
-#                 action = env.action_space.sample()
-#             else:
-#                 state_tensor = torch.FloatTensor(state).unsqueeze(0)
-#                 action = torch.argmax(q_network(state_tensor)).item()
-
-#             next_state, reward, done, _, _ = env.step(action)
-#             replay_buffer.add(state, action, reward, next_state, done)
-
-#             state = next_state
-#             total_reward += reward
-
-#             if done:
-#                 break
-
-#             # Training step
-#             if len(replay_buffer) >= BATCH_SIZE:
-#                 states, actions, rewards, next_states, dones = replay_buffer.sample(BATCH_SIZE)
-
-#                 states = torch.FloatTensor(states)
-#                 actions = torch.LongTensor(actions).unsqueeze(1)
-#                 rewards = torch.FloatTensor(rewards).unsqueeze(1)
-#                 next_states = torch.FloatTensor(next_states)
-#                 dones = torch.FloatTensor(dones).unsqueeze(1)
-
-#                 q_values = q_network(states).gather(1, actions)
-#                 next_actions = torch.argmax(q_network(next_states), dim=1, keepdim=True)
-#                 target_q_values = target_network(next_states).gather(1, next_actions)
-
-#                 targets = rewards + (DISCOUNT_FACTOR * target_q_values * (1 - dones))
-#                 loss = nn.MSELoss()(q_values, targets.detach())
-
-#                 optimizer.zero_grad()
-#                 loss.backward()
-#                 optimizer.step()
-
-#             # Update target network
-#             if steps % TARGET_UPDATE_FREQ == 0:
-#                 target_network.load_state_dict(q_network.state_dict())
-
-#         # Decay epsilon
-#         epsilon = max(EPSILON_END, epsilon - epsilon_decay)
-#         all_rewards.append(total_reward)
-#         print(f"Episode {episode + 1}, Total Reward: {total_reward}, Epsilon: {epsilon:.2f}")
-
-#     env.close()
-
-#     # Plot learning curve
-#     plt.plot(all_rewards)
-#     plt.xlabel("Episode")
-#     plt.ylabel("Total Reward")
-#     plt.title("Learning Curve")
-#     plt.show()
-
-# if __name__ == "__main__":
-#     train_ddqn()
 
