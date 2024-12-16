@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import os
 import re
 
+# Check if CUDA is available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 # Define the Actor Network
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
@@ -56,7 +59,7 @@ class ReplayBuffer:
 
 # Hyperparameters
 ENV_NAME = "Walker2d-v4"
-EPISODES = 500
+EPISODES = 2000
 MAX_STEPS = 1000
 LEARNING_RATE_ACTOR = 0.0001
 LEARNING_RATE_CRITIC = 0.001
@@ -73,10 +76,11 @@ def train_ddpg():
     action_dim = env.action_space.shape[0]
     max_action = float(env.action_space.high[0])
 
-    actor = Actor(state_dim, action_dim, max_action)
-    target_actor = Actor(state_dim, action_dim, max_action)
-    critic = Critic(state_dim, action_dim)
-    target_critic = Critic(state_dim, action_dim)
+    # Create the models
+    actor = Actor(state_dim, action_dim, max_action).to(device)
+    target_actor = Actor(state_dim, action_dim, max_action).to(device)
+    critic = Critic(state_dim, action_dim).to(device)
+    target_critic = Critic(state_dim, action_dim).to(device)
 
     # Load the latest checkpoint if available
     checkpoint_pattern = re.compile(r"actor_episode_(\d+)\.pth")
@@ -107,7 +111,7 @@ def train_ddpg():
 
     all_rewards = []
 
-    for episode in range(last_episode+1, last_episode+EPISODES+1,1 ):
+    for episode in range(last_episode + 1, last_episode + EPISODES + 1, 1):
         state, _ = env.reset()
         total_reward = 0
 
@@ -115,8 +119,8 @@ def train_ddpg():
             env.render()  # Render the environment
 
             # Select action with exploration noise 
-            state_tensor = torch.FloatTensor(state).unsqueeze(0)
-            action = actor(state_tensor).detach().numpy()[0]
+            state_tensor = torch.FloatTensor(state).to(device).unsqueeze(0)
+            action = actor(state_tensor).detach().cpu().numpy()[0]
             action += np.random.normal(0, EXPLORATION_NOISE, size=action_dim)
             action = np.clip(action, -max_action, max_action)
 
@@ -131,11 +135,11 @@ def train_ddpg():
             if len(replay_buffer) >= BATCH_SIZE:
                 states, actions, rewards, next_states, dones = replay_buffer.sample(BATCH_SIZE)
 
-                states = torch.FloatTensor(states)
-                actions = torch.FloatTensor(actions)
-                rewards = torch.FloatTensor(rewards).unsqueeze(1)
-                next_states = torch.FloatTensor(next_states)
-                dones = torch.FloatTensor(dones).unsqueeze(1)
+                states = torch.FloatTensor(states).to(device)
+                actions = torch.FloatTensor(actions).to(device)
+                rewards = torch.FloatTensor(rewards).to(device).unsqueeze(1)
+                next_states = torch.FloatTensor(next_states).to(device)
+                dones = torch.FloatTensor(dones).to(device).unsqueeze(1)
 
                 # Critic update
                 with torch.no_grad():
@@ -166,13 +170,13 @@ def train_ddpg():
                 break
 
         all_rewards.append(total_reward)
-        print(f"Episode {episode + 1}, Total Reward: {total_reward}")
+        print(f"Episode {episode}, Total Reward: {total_reward}")
 
-        # Save the models every 100 episodes
-        if (episode) % 100 == 0:
+        # Save the models every 500 episodes
+        if (episode) % 500 == 0:
             torch.save(actor.state_dict(), f"actor_episode_{episode}.pth")
             torch.save(critic.state_dict(), f"critic_episode_{episode}.pth")
-            print(f"Saved models at episode {episode + 1}")
+            print(f"Saved models at episode {episode}")
 
             # Save the reward graph
             plt.figure()
