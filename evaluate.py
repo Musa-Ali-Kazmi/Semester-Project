@@ -84,6 +84,6 @@ if __name__ == "__main__":
         # Get the checkpoint with the highest episode number
         latest_checkpoint = max(checkpoint_files, key=lambda f: int(checkpoint_pattern.match(f).group(1)))
         print(f"Using checkpoint: {latest_checkpoint}")
-        test_ddpg(latest_checkpoint, episodes=10, render=True)
+        test_ddpg(latest_checkpoint, episodes=100, render=True)
     else:
         print("No actor checkpoints found. Please train the model first.")

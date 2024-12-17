@@ -60,7 +60,7 @@ class ReplayBuffer:
 # Hyperparameters
 ENV_NAME = "Walker2d-v4"
 EPISODES = 2000
-MAX_STEPS = 1000
+MAX_STEPS = 2000
 LEARNING_RATE_ACTOR = 0.0001
 LEARNING_RATE_CRITIC = 0.001
 DISCOUNT_FACTOR = 0.99
@@ -71,7 +71,7 @@ EXPLORATION_NOISE = 0.1  # Stddev for action noise
 
 # Training Function
 def train_ddpg():
-    env = gym.make(ENV_NAME, render_mode="human")  # Specify the render mode
+    env = gym.make(ENV_NAME, render_mode="human", forward_reward_weight=3.0, ctrl_cost_weight = 0.004, healthy_reward=1.0)  # Specify the render mode
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     max_action = float(env.action_space.high[0])
@@ -183,8 +183,8 @@ def train_ddpg():
         all_actor_losses.append(np.mean(actor_loss_episode))
         all_critic_losses.append(np.mean(critic_loss_episode))
 
-        # Save the models every 500 episodes
-        if (episode) % 500 == 0:
+        # Save the models every 1000 episodes
+        if (episode) % 1000 == 0:
             torch.save(actor.state_dict(), f"actor_episode_{episode}.pth")
             torch.save(critic.state_dict(), f"critic_episode_{episode}.pth")
             print(f"Saved models at episode {episode}")
