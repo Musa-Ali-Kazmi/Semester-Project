@@ -24,7 +24,7 @@ class Actor(torch.nn.Module):
 
 # Function to test the trained actor model
 def test_ddpg(actor_checkpoint, env_name="Walker2d-v4", episodes=10, render=True):
-    env = gym.make(env_name, render_mode="human" if render else None)
+    env = gym.make(env_name, render_mode="human" if render else None, terminate_when_unhealthy=True)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     max_action = float(env.action_space.high[0])
